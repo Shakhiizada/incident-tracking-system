@@ -14,7 +14,7 @@ export default async function AdminPage() {
     openIncidents: incidents?.filter(i => i.status === "open").length || 0,
     criticalIncidents: incidents?.filter(i => i.priority === "critical").length || 0,
     totalUsers: teamMembers?.length || 0,
-    activeUsers: teamMembers?.filter(m => m.status === "active").length || 0,
+    activeUsers: teamMembers?.filter(m => m.is_active).length || 0,
     admins: teamMembers?.filter(m => m.role === "admin").length || 0,
   }
 

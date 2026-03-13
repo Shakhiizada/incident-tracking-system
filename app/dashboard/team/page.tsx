@@ -68,7 +68,7 @@ export default async function TeamPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {teamMembers?.filter(m => m.status === "active").length || 0}
+              {teamMembers?.filter(m => m.is_active).length || 0}
             </div>
           </CardContent>
         </Card>
@@ -103,8 +103,8 @@ export default async function TeamPage() {
                     <Badge variant={getRoleBadge(member.role) as "destructive" | "default" | "secondary" | "outline"}>
                       {getRoleLabel(member.role)}
                     </Badge>
-                    <Badge variant={member.status === "active" ? "default" : "secondary"}>
-                      {member.status === "active" ? "Активен" : "Неактивен"}
+                    <Badge variant={member.is_active ? "default" : "secondary"}>
+                      {member.is_active ? "Активен" : "Неактивен"}
                     </Badge>
                   </div>
                 </div>

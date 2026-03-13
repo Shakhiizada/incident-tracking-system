@@ -51,8 +51,7 @@ export default function NewIncidentPage() {
           priority: formData.priority,
           category: formData.category,
           status: "open",
-          user_id: user.id,
-          created_by: user.id,
+          reporter_id: user.id,
         })
 
       if (insertError) throw insertError

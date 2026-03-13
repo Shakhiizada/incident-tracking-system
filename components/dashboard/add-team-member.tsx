@@ -51,7 +51,7 @@ export function AddTeamMember() {
           name: formData.name,
           email: formData.email,
           role: formData.role,
-          status: "active",
+          is_active: true,
           user_id: user.id,
         })
 
