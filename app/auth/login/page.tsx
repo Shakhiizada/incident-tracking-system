@@ -12,12 +12,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { Shield, AlertCircle, Loader2 } from 'lucide-react'
+import { Shield, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react'
 import { signIn } from '../actions'
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleSubmit = async (formData: FormData) => {
     setError(null)
@@ -35,6 +36,8 @@ export default function LoginPage() {
           setError('Слишком много попыток входа. Подождите несколько минут.')
         } else if (result.error.includes('User not found')) {
           setError('Пользователь не найден. Проверьте email или зарегистрируйтесь.')
+        } else if (result.error.includes('fetch') || result.error.includes('ENOTFOUND') || result.error.includes('подключения')) {
+          setError('Ошибка подключения к серверу. Пожалуйста, подождите минуту и попробуйте снова.')
         } else {
           setError(result.error)
         }
@@ -74,15 +77,26 @@ export default function LoginPage() {
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="password">Пароль</Label>
-                    <Input
-                      id="password"
-                      name="password"
-                      type="password"
-                      placeholder="Введите пароль"
-                      required
-                      disabled={isPending}
-                      autoComplete="current-password"
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Введите пароль"
+                        required
+                        disabled={isPending}
+                        autoComplete="current-password"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                   
                   {error && (

@@ -13,13 +13,15 @@ import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
-import { Shield, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
+import { Shield, AlertCircle, CheckCircle, Loader2, Eye, EyeOff } from 'lucide-react'
 import { signUp } from '../actions'
 
 export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const router = useRouter()
 
   const handleSubmit = async (formData: FormData) => {
@@ -51,6 +53,8 @@ export default function SignUpPage() {
           setError('Неверный формат email или этот email уже зарегистрирован.')
         } else if (result.error.includes('rate limit')) {
           setError('Слишком много попыток. Подождите несколько минут.')
+        } else if (result.error.includes('fetch') || result.error.includes('ENOTFOUND') || result.error.includes('network')) {
+          setError('Ошибка подключения к серверу. Пожалуйста, подождите минуту и попробуйте снова.')
         } else {
           setError(result.error)
         }
@@ -116,27 +120,49 @@ export default function SignUpPage() {
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="password">Пароль</Label>
-                    <Input
-                      id="password"
-                      name="password"
-                      type="password"
-                      placeholder="Минимум 6 символов"
-                      required
-                      minLength={6}
-                      disabled={isPending}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Минимум 6 символов"
+                        required
+                        minLength={6}
+                        disabled={isPending}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="confirmPassword">Подтвердите пароль</Label>
-                    <Input
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      type="password"
-                      placeholder="Повторите пароль"
-                      required
-                      minLength={6}
-                      disabled={isPending}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Повторите пароль"
+                        required
+                        minLength={6}
+                        disabled={isPending}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        tabIndex={-1}
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                   
                   {error && (
