@@ -14,39 +14,96 @@ import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { Shield } from 'lucide-react'
+import { Shield, AlertCircle, CheckCircle } from 'lucide-react'
 
 export default function SignUpPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
+  const validatePassword = (pass: string): string | null => {
+    if (pass.length < 6) {
+      return 'Пароль должен содержать минимум 6 символов'
+    }
+    return null
+  }
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
-    const supabase = createClient()
     setIsLoading(true)
     setError(null)
+    setSuccess(null)
+
+    // Validate passwords match
+    if (password !== confirmPassword) {
+      setError('Пароли не совпадают')
+      setIsLoading(false)
+      return
+    }
+
+    // Validate password strength
+    const passwordError = validatePassword(password)
+    if (passwordError) {
+      setError(passwordError)
+      setIsLoading(false)
+      return
+    }
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
+      const supabase = createClient()
+      
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
         password,
         options: {
-          emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
-            `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}/dashboard`,
           data: {
-            full_name: fullName,
+            full_name: fullName.trim(),
           },
         },
       })
-      if (error) throw error
-      router.push('/auth/sign-up-success')
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'Произошла ошибка')
+
+      if (signUpError) {
+        // Handle specific error messages
+        if (signUpError.message.includes('Password')) {
+          setError('Пароль слишком слабый. Используйте минимум 6 символов, включая буквы и цифры.')
+        } else if (signUpError.message.includes('email')) {
+          setError('Неверный формат email или этот email уже зарегистрирован.')
+        } else if (signUpError.message.includes('rate limit')) {
+          setError('Слишком много попыток. Подождите несколько минут.')
+        } else {
+          setError(signUpError.message)
+        }
+        return
+      }
+
+      // Check if email confirmation is required
+      if (data?.user?.identities?.length === 0) {
+        setError('Этот email уже зарегистрирован. Попробуйте войти.')
+        return
+      }
+
+      // Check if user needs to confirm email
+      if (data?.user && !data?.session) {
+        setSuccess('Регистрация успешна! Проверьте вашу почту для подтверждения.')
+        setTimeout(() => {
+          router.push('/auth/sign-up-success')
+        }, 2000)
+      } else if (data?.session) {
+        // User is automatically signed in (email confirmation disabled)
+        setSuccess('Регистрация успешна! Перенаправление...')
+        setTimeout(() => {
+          router.push('/dashboard')
+        }, 1000)
+      }
+    } catch (err) {
+      setError('Произошла неожиданная ошибка. Попробуйте позже.')
+      console.error('[v0] Sign up error:', err)
     } finally {
       setIsLoading(false)
     }
@@ -69,7 +126,7 @@ export default function SignUpPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSignUp}>
-                <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="fullName">Полное имя</Label>
                     <Input
@@ -79,6 +136,7 @@ export default function SignUpPage() {
                       required
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -90,6 +148,7 @@ export default function SignUpPage() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -97,16 +156,42 @@ export default function SignUpPage() {
                     <Input
                       id="password"
                       type="password"
+                      placeholder="Минимум 6 символов"
                       required
                       minLength={6}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      disabled={isLoading}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Минимум 6 символов
-                    </p>
                   </div>
-                  {error && <p className="text-sm text-destructive">{error}</p>}
+                  <div className="grid gap-2">
+                    <Label htmlFor="confirmPassword">Подтвердите пароль</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      placeholder="Повторите пароль"
+                      required
+                      minLength={6}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  
+                  {error && (
+                    <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+                  
+                  {success && (
+                    <div className="flex items-center gap-2 rounded-md bg-green-500/10 p-3 text-sm text-green-600">
+                      <CheckCircle className="h-4 w-4 shrink-0" />
+                      <span>{success}</span>
+                    </div>
+                  )}
+                  
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? 'Регистрация...' : 'Зарегистрироваться'}
                   </Button>

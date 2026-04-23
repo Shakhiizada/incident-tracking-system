@@ -14,30 +14,59 @@ import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { Shield } from 'lucide-react'
+import { Shield, AlertCircle, CheckCircle } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const supabase = createClient()
     setIsLoading(true)
     setError(null)
+    setSuccess(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
+      const supabase = createClient()
+      
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
         password,
       })
-      if (error) throw error
-      router.push('/dashboard')
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'Произошла ошибка')
+
+      if (signInError) {
+        // Handle specific error messages in Russian
+        if (signInError.message.includes('Invalid login credentials')) {
+          setError('Неверный email или пароль. Проверьте данные и попробуйте снова.')
+        } else if (signInError.message.includes('Email not confirmed')) {
+          setError('Email не подтвержден. Проверьте вашу почту для подтверждения.')
+        } else if (signInError.message.includes('rate limit')) {
+          setError('Слишком много попыток входа. Подождите несколько минут.')
+        } else if (signInError.message.includes('User not found')) {
+          setError('Пользователь не найден. Проверьте email или зарегистрируйтесь.')
+        } else {
+          setError(signInError.message)
+        }
+        return
+      }
+
+      if (data?.session) {
+        setSuccess('Вход выполнен успешно! Перенаправление...')
+        
+        // Force refresh to update auth state
+        router.refresh()
+        
+        setTimeout(() => {
+          router.push('/dashboard')
+        }, 500)
+      }
+    } catch (err) {
+      setError('Произошла неожиданная ошибка. Попробуйте позже.')
+      console.error('[v0] Login error:', err)
     } finally {
       setIsLoading(false)
     }
@@ -60,7 +89,7 @@ export default function LoginPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleLogin}>
-                <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
@@ -70,6 +99,8 @@ export default function LoginPage() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      disabled={isLoading}
+                      autoComplete="email"
                     />
                   </div>
                   <div className="grid gap-2">
@@ -77,12 +108,29 @@ export default function LoginPage() {
                     <Input
                       id="password"
                       type="password"
+                      placeholder="Введите пароль"
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
+                      disabled={isLoading}
+                      autoComplete="current-password"
                     />
                   </div>
-                  {error && <p className="text-sm text-destructive">{error}</p>}
+                  
+                  {error && (
+                    <div className="flex items-center gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{error}</span>
+                    </div>
+                  )}
+                  
+                  {success && (
+                    <div className="flex items-center gap-2 rounded-md bg-green-500/10 p-3 text-sm text-green-600">
+                      <CheckCircle className="h-4 w-4 shrink-0" />
+                      <span>{success}</span>
+                    </div>
+                  )}
+                  
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? 'Вход...' : 'Войти'}
                   </Button>
