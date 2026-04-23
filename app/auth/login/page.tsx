@@ -1,6 +1,5 @@
 'use client'
 
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -12,64 +11,35 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-import { Shield, AlertCircle, CheckCircle } from 'lucide-react'
+import { useState, useTransition } from 'react'
+import { Shield, AlertCircle, Loader2 } from 'lucide-react'
+import { signIn } from '../actions'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+  const handleSubmit = async (formData: FormData) => {
     setError(null)
-    setSuccess(null)
 
-    try {
-      const supabase = createClient()
-      
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      })
+    startTransition(async () => {
+      const result = await signIn(formData)
 
-      if (signInError) {
-        // Handle specific error messages in Russian
-        if (signInError.message.includes('Invalid login credentials')) {
+      if (result?.error) {
+        // Translate common errors to Russian
+        if (result.error.includes('Invalid login credentials')) {
           setError('Неверный email или пароль. Проверьте данные и попробуйте снова.')
-        } else if (signInError.message.includes('Email not confirmed')) {
+        } else if (result.error.includes('Email not confirmed')) {
           setError('Email не подтвержден. Проверьте вашу почту для подтверждения.')
-        } else if (signInError.message.includes('rate limit')) {
+        } else if (result.error.includes('rate limit')) {
           setError('Слишком много попыток входа. Подождите несколько минут.')
-        } else if (signInError.message.includes('User not found')) {
+        } else if (result.error.includes('User not found')) {
           setError('Пользователь не найден. Проверьте email или зарегистрируйтесь.')
         } else {
-          setError(signInError.message)
+          setError(result.error)
         }
-        return
       }
-
-      if (data?.session) {
-        setSuccess('Вход выполнен успешно! Перенаправление...')
-        
-        // Force refresh to update auth state
-        router.refresh()
-        
-        setTimeout(() => {
-          router.push('/dashboard')
-        }, 500)
-      }
-    } catch (err) {
-      setError('Произошла неожиданная ошибка. Попробуйте позже.')
-      console.error('[v0] Login error:', err)
-    } finally {
-      setIsLoading(false)
-    }
+    })
   }
 
   return (
@@ -88,18 +58,17 @@ export default function LoginPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleLogin}>
+              <form action={handleSubmit}>
                 <div className="flex flex-col gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
+                      name="email"
                       type="email"
                       placeholder="example@email.com"
                       required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={isLoading}
+                      disabled={isPending}
                       autoComplete="email"
                     />
                   </div>
@@ -107,12 +76,11 @@ export default function LoginPage() {
                     <Label htmlFor="password">Пароль</Label>
                     <Input
                       id="password"
+                      name="password"
                       type="password"
                       placeholder="Введите пароль"
                       required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={isLoading}
+                      disabled={isPending}
                       autoComplete="current-password"
                     />
                   </div>
@@ -124,15 +92,15 @@ export default function LoginPage() {
                     </div>
                   )}
                   
-                  {success && (
-                    <div className="flex items-center gap-2 rounded-md bg-green-500/10 p-3 text-sm text-green-600">
-                      <CheckCircle className="h-4 w-4 shrink-0" />
-                      <span>{success}</span>
-                    </div>
-                  )}
-                  
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Вход...' : 'Войти'}
+                  <Button type="submit" className="w-full" disabled={isPending}>
+                    {isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Вход...
+                      </>
+                    ) : (
+                      'Войти'
+                    )}
                   </Button>
                 </div>
                 <div className="mt-4 text-center text-sm">

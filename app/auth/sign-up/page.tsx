@@ -1,6 +1,5 @@
 'use client'
 
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -13,100 +12,66 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
-import { Shield, AlertCircle, CheckCircle } from 'lucide-react'
+import { useState, useTransition } from 'react'
+import { Shield, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
+import { signUp } from '../actions'
 
 export default function SignUpPage() {
-  const [fullName, setFullName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
-  const validatePassword = (pass: string): string | null => {
-    if (pass.length < 6) {
-      return 'Пароль должен содержать минимум 6 символов'
-    }
-    return null
-  }
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+  const handleSubmit = async (formData: FormData) => {
     setError(null)
     setSuccess(null)
 
-    // Validate passwords match
+    const password = formData.get('password') as string
+    const confirmPassword = formData.get('confirmPassword') as string
+
+    // Client-side validation
     if (password !== confirmPassword) {
       setError('Пароли не совпадают')
-      setIsLoading(false)
       return
     }
 
-    // Validate password strength
-    const passwordError = validatePassword(password)
-    if (passwordError) {
-      setError(passwordError)
-      setIsLoading(false)
+    if (password.length < 6) {
+      setError('Пароль должен содержать минимум 6 символов')
       return
     }
 
-    try {
-      const supabase = createClient()
-      
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
-          data: {
-            full_name: fullName.trim(),
-          },
-        },
-      })
+    startTransition(async () => {
+      const result = await signUp(formData)
 
-      if (signUpError) {
-        // Handle specific error messages
-        if (signUpError.message.includes('Password')) {
-          setError('Пароль слишком слабый. Используйте минимум 6 символов, включая буквы и цифры.')
-        } else if (signUpError.message.includes('email')) {
+      if (result.error) {
+        // Translate common errors to Russian
+        if (result.error.includes('Password')) {
+          setError('Пароль слишком слабый. Используйте минимум 6 символов.')
+        } else if (result.error.includes('email') || result.error.includes('Email')) {
           setError('Неверный формат email или этот email уже зарегистрирован.')
-        } else if (signUpError.message.includes('rate limit')) {
+        } else if (result.error.includes('rate limit')) {
           setError('Слишком много попыток. Подождите несколько минут.')
         } else {
-          setError(signUpError.message)
+          setError(result.error)
         }
         return
       }
 
-      // Check if email confirmation is required
-      if (data?.user?.identities?.length === 0) {
-        setError('Этот email уже зарегистрирован. Попробуйте войти.')
-        return
+      if (result.success) {
+        if (result.needsEmailConfirmation) {
+          setSuccess('Регистрация успешна! Проверьте вашу почту для подтверждения.')
+          setTimeout(() => {
+            router.push('/auth/sign-up-success')
+          }, 2000)
+        } else {
+          setSuccess('Регистрация успешна! Перенаправление...')
+          router.refresh()
+          setTimeout(() => {
+            router.push('/dashboard')
+          }, 1000)
+        }
       }
-
-      // Check if user needs to confirm email
-      if (data?.user && !data?.session) {
-        setSuccess('Регистрация успешна! Проверьте вашу почту для подтверждения.')
-        setTimeout(() => {
-          router.push('/auth/sign-up-success')
-        }, 2000)
-      } else if (data?.session) {
-        // User is automatically signed in (email confirmation disabled)
-        setSuccess('Регистрация успешна! Перенаправление...')
-        setTimeout(() => {
-          router.push('/dashboard')
-        }, 1000)
-      }
-    } catch (err) {
-      setError('Произошла неожиданная ошибка. Попробуйте позже.')
-      console.error('[v0] Sign up error:', err)
-    } finally {
-      setIsLoading(false)
-    }
+    })
   }
 
   return (
@@ -125,56 +90,52 @@ export default function SignUpPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSignUp}>
+              <form action={handleSubmit}>
                 <div className="flex flex-col gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="fullName">Полное имя</Label>
                     <Input
                       id="fullName"
+                      name="fullName"
                       type="text"
                       placeholder="Иван Иванов"
                       required
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      disabled={isLoading}
+                      disabled={isPending}
                     />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
+                      name="email"
                       type="email"
                       placeholder="example@email.com"
                       required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={isLoading}
+                      disabled={isPending}
                     />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="password">Пароль</Label>
                     <Input
                       id="password"
+                      name="password"
                       type="password"
                       placeholder="Минимум 6 символов"
                       required
                       minLength={6}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={isLoading}
+                      disabled={isPending}
                     />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="confirmPassword">Подтвердите пароль</Label>
                     <Input
                       id="confirmPassword"
+                      name="confirmPassword"
                       type="password"
                       placeholder="Повторите пароль"
                       required
                       minLength={6}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      disabled={isLoading}
+                      disabled={isPending}
                     />
                   </div>
                   
@@ -192,8 +153,15 @@ export default function SignUpPage() {
                     </div>
                   )}
                   
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Регистрация...' : 'Зарегистрироваться'}
+                  <Button type="submit" className="w-full" disabled={isPending}>
+                    {isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Регистрация...
+                      </>
+                    ) : (
+                      'Зарегистрироваться'
+                    )}
                   </Button>
                 </div>
                 <div className="mt-4 text-center text-sm">
